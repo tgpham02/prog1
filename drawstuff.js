@@ -264,10 +264,10 @@ function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
     if(t1 > 0 && t2 > 0 ){
         t = Math.min(t1, t2);
     }
-    elseif(t1 == 0){
+    if(t1 == 0){
         t = t2;
     }
-    elseif(t2 == 0 ){
+    if(t2 == 0 ){
         t = 1;
     }
     
