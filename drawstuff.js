@@ -253,9 +253,13 @@ function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
 
     // Calculate discriminant
     var discriminant = b * b - 4 * a * c;
-    t1 = (-b + Math.sqrt(discriminant))/(2*a);
-    t2 = (-b + Math.sqrt(discriminant))/(2*a);
-    t = Math.max(t1, t2);
+    if ((-b + Math.sqrt(discriminant))/(2*a) > 0) {
+    	t1 = (-b + Math.sqrt(discriminant))/(2*a); 	
+    }	    
+    if ((-b + Math.sqrt(discriminant))/(2*a) > 0) {
+    	t2 = (-b - Math.sqrt(discriminant))/(2*a); 	
+    }
+    t = Math.min(t1, t2);
     
 
     if (discriminant < 0) {
