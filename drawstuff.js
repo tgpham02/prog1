@@ -40,6 +40,15 @@ class Color {
     } // end Color change method
 } // end color class
 
+// Function to multiply a Color by a scalar value
+function multiplyColor(color, num) {
+    return new Color(
+        color.r * num,
+        color.g * num,
+        color.b * num,
+        color.a * num
+    );
+}
 
 /* utility functions */
 
@@ -148,6 +157,173 @@ function getInputBoxes() {
     } else
         return JSON.parse(httpReq.response); 
 } // end get input boxes
+
+
+function blinnPhongShading(Ix, Iy, Iz, ellipsoid) {
+    // Calculate the normal vector at the intersection point
+
+    var normalVec = [
+        2*(Ix-ellipsoid.x)/(ellipsoid.a*ellipsoid.a),
+        2*(Iy-ellipsoid.y)/(ellipsoid.b*ellipsoid.b),
+        2*(Iz-ellipsoid.z)/(ellipsoid.c*ellipsoid.c)
+    ];
+
+    // Normalize the normal vector-try using normal vector
+    var normalLen = Math.sqrt(normalVec[0]*normalVec[0]+normalVec[1]*normalVec[1]+normalVec[2]*normalVec[2]);
+    normalVec = [normalVec[0]/normalLen,normalVec[1]/normalLen,normalVec[2]/normalLen];
+
+    // Define light properties
+    var lightPos = [-0.5, 1.5, -0.5]; 
+    var lightCol = [1, 1, 1]; 
+    var ambCol = [1, 1, 1]; 
+    var specCol = [1, 1, 1]; 
+    var shininess = 5;
+
+    // Calculate the direction vector from the intersection point to the light source
+    var lightDir = [
+        lightPos[0] - Ix,
+        lightPos[1] - Iy,
+        lightPos[2] - Iz
+    ];
+
+    // Normalize the light direction vector-try using vector normalize
+    var lightDirLen = Math.sqrt(lightDir[0] * lightDir[0] + lightDir[1] * lightDir[1] + lightDir[2] * lightDir[2]);
+    lightDir = [lightDir[0] / lightDirLen, lightDir[1] / lightDirLen, lightDir[2] / lightDirLen];
+
+    // Calculate the view direction (from the camera)
+    var viewDir = [0, 0, -1]; // Example view direction
+
+    // Calculate the half-vector between the light and view directions
+    var halfVec = [
+        (lightDir[0] + viewDir[0])/2,
+        (lightDir[1] + viewDir[1])/2,
+        (lightDir[2] + viewDir[2])/2
+    ];
+
+    // Normalize the half-vector
+    var halfVecLen = Math.sqrt(halfVec[0] * halfVec[0] + halfVec[1] * halfVec[1] + halfVec[2] * halfVec[2]);
+    halfVec = [halfVec[0] / halfVecLen, halfVec[1] / halfVecLen, halfVec[2] / halfVecLen];
+
+    // Calculate the dot products needed for the Blinn-Phong model
+    var normalDotLight = Math.max(0, normalVec[0] * lightDir[0] + normalVec[1] * lightDir[1] + normalVec[2] * lightDir[2]);
+    var specDotView = Math.max(0, Math.pow(normalVec[0] * halfVec[0] + normalVec[1] * halfVec[1] + normalVec[2] * halfVec[2], shininess));
+
+    // Calculate the final shading color
+    var ambientComp = [ambCol[0] * ellipsoid.diffuse[0], ambCol[1] * ellipsoid.diffuse[1], ambCol[2] * ellipsoid.diffuse[2]];
+    var diffuseComp = [lightCol[0] * ellipsoid.diffuse[0] * normalDotLight, lightCol[1] * ellipsoid.diffuse[1] * normalDotLight, lightCol[2] * ellipsoid.diffuse[2] * normalDotLight];
+    var specComp = [lightCol[0] * specCol[0] * specDotView, lightCol[1] * specCol[1] * specDotView, lightCol[2] * specCol[2] * specDotView];
+
+    var shadingCol = [
+        ambientComp[0] + diffuseComp[0] + specComp[0],
+        ambientComp[1] + diffuseComp[1] + specComp[1],
+        ambientComp[2] + diffuseComp[2] + specComp[2]
+    ];
+
+    return shadingCol;
+}
+
+
+// Function to check for intersection between a ray and an ellipsoid
+function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
+    // Translate the ray origin to the local coordinate system of the ellipsoid
+    var rayOriginLocal = new Vector(
+        rayOrigin.x-ellipsoid.x,
+        rayOrigin.y-ellipsoid.y,
+        rayOrigin.z-ellipsoid.z
+    );
+
+    // Calculate coefficients for the quadratic equation
+    var a = (
+        (rayDir.x * rayDir.x) / (ellipsoid.a * ellipsoid.a) +
+        (rayDir.y * rayDir.y) / (ellipsoid.b * ellipsoid.b) +
+        (rayDir.z * rayDir.z) / (ellipsoid.c * ellipsoid.c)
+    );
+
+    var b = (
+        (2 * rayOriginLocal.x * rayDir.x) / (ellipsoid.a * ellipsoid.a) +
+        (2 * rayOriginLocal.y * rayDir.y) / (ellipsoid.b * ellipsoid.b) +
+        (2 * rayOriginLocal.z * rayDir.z) / (ellipsoid.c * ellipsoid.c)
+    );
+
+    var c = (
+        (rayOriginLocal.x * rayOriginLocal.x) / (ellipsoid.a * ellipsoid.a) +
+        (rayOriginLocal.y * rayOriginLocal.y) / (ellipsoid.b * ellipsoid.b) +
+        (rayOriginLocal.z * rayOriginLocal.z) / (ellipsoid.c * ellipsoid.c) - 1
+    );
+
+    // Calculate discriminant
+    var discriminant = b * b - 4 * a * c;
+    t1 = (-b + Math.sqrt(discriminant))/(2*a);
+    t2 = (-b + Math.sqrt(discriminant))/(2*a);
+    t = Math.max(t1, t2);
+    
+
+    if (discriminant < 0) {
+        // No intersection with the ellipsoid
+        return false;
+    } else {
+        // Ray intersects the ellipsoid
+        return true;
+    }
+}
+
+/* Ray casting to render unlit ellipsoids */
+function drawRayTraceEllipsoids(context) {
+    var inputEllipsoids = getInputEllipsoids();
+    var w = context.canvas.width;
+    var h = context.canvas.height;
+    var imagedata = context.createImageData(w, h);
+    
+    var eye = new Vector(0.5, 0.5, -0.5);
+    var viewUp = new Vector(0, 1, 0);
+    var lookAt = new Vector(0, 0, 1);
+    var windowDistance = 0.5;
+    var windowSize = 1.0;
+
+    if (inputEllipsoids != String.null) {
+        var c = new Color(0, 0, 0, 0); // Initialize the color
+        var n = inputEllipsoids.length; // the number of input ellipsoids
+        for (var e=0; e<n; e++) {
+            var ellipsoid = inputEllipsoids[e];
+            var ellipsoidColor = new Color(
+                ellipsoid.diffuse[0] * 255,
+                ellipsoid.diffuse[1] * 255,
+                ellipsoid.diffuse[2] * 255,
+                255
+            );
+            for (var x=0; x<w; x++) {
+                for (var y=0; y<h; y++) {
+                    var cX = (x / w - 0.5) * windowSize;
+                    var cY = (y / h - 0.5) * windowSize;
+                    var cZ = -windowDistance;
+                    var rayOrigin = eye;
+                    var rayDirection = Vector.normalize(new Vector(cX, cY, cZ));
+                    var tx = 0;
+                    var ty = 0;
+                    var tFin = 0;
+                    if (rayIntersectsEllipsoid(tx, ty, tFin, rayOrigin, rayDirection, ellipsoid)) {
+                        var Ix = rayOrigin.x + tFin * rayDirection.x;
+                        var Iy = rayOrigin.y + tFin * rayDirection.y;
+                        var Iz = rayOrigin.z + tFin * rayDirection.z;
+                        var shadingColor = blinnPhongShading(Ix, Iy, Iz, ellipsoid);
+                        var endCol = new Color(
+                            shadingColor[0] * 255,
+                            shadingColor[1] * 255,
+                            shadingColor[2] * 255,
+                            255
+                        )
+                        drawPixel(imagedata, x, y, endCol);
+                    }
+
+
+                }
+            }
+        }
+
+        context.putImageData(imagedata, 0, 0);
+    }
+}
+
 
 // put random points in the ellipsoids from the class github
 function drawRandPixelsInInputEllipsoids(context) {
@@ -458,6 +634,131 @@ function drawInputBoxesUsingPaths(context) {
     } // end if box files found
 } // end draw input boxes
 
+
+
+
+class Vector { 
+    constructor(x=0,y=0,z=0) {
+        this.set(x,y,z);
+    } // end constructor
+    
+    // sets the components of a vector
+    set(x,y,z) {
+        try {
+            if ((typeof(x) !== "number") || (typeof(y) !== "number") || (typeof(z) !== "number"))
+                throw "vector component not a number";
+            else
+                this.x = x; this.y = y; this.z = z; 
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+        }
+    } // end vector set
+    
+    // copy the passed vector into this one
+    copy(v) {
+        try {
+            if (!(v instanceof Vector))
+                throw "Vector.copy: non-vector parameter";
+            else
+                this.x = v.x; this.y = v.y; this.z = v.z;
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+        }
+    }
+    
+    toConsole(prefix) {
+        console.log(prefix+"["+this.x+","+this.y+","+this.z+"]");
+    } // end to console
+    
+    // static dot method
+    static dot(v1,v2) {
+        try {
+            if (!(v1 instanceof Vector) || !(v2 instanceof Vector))
+                throw "Vector.dot: non-vector parameter";
+            else
+                return(v1.x*v2.x + v1.y*v2.y + v1.z*v2.z);
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+            return(NaN);
+        }
+    } // end dot static method
+    
+    // static add method
+    static add(v1,v2) {
+        try {
+            if (!(v1 instanceof Vector) || !(v2 instanceof Vector))
+                throw "Vector.add: non-vector parameter";
+            else
+                return(new Vector(v1.x+v2.x,v1.y+v2.y,v1.z+v2.z));
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+            return(new Vector(NaN,NaN,NaN));
+        }
+    } // end add static method
+
+    // static subtract method, v1-v2
+    static subtract(v1,v2) {
+        try {
+            if (!(v1 instanceof Vector) || !(v2 instanceof Vector))
+                throw "Vector.subtract: non-vector parameter";
+            else {
+                var v = new Vector(v1.x-v2.x,v1.y-v2.y,v1.z-v2.z);
+                //v.toConsole("Vector.subtract: ");
+                return(v);
+            }
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+            return(new Vector(NaN,NaN,NaN));
+        }
+    } // end subtract static method
+
+    // static scale method
+    static scale(c,v) {
+        try {
+            if (!(typeof(c) === "number") || !(v instanceof Vector))
+                throw "Vector.scale: malformed parameter";
+            else
+                return(new Vector(c*v.x,c*v.y,c*v.z));
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+            return(new Vector(NaN,NaN,NaN));
+        }
+    } // end scale static method
+    
+    // static normalize method
+    static normalize(v) {
+        try {
+            if (!(v instanceof Vector))
+                throw "Vector.normalize: parameter not a vector";
+            else {
+                var lenDenom = 1/Math.sqrt(Vector.dot(v,v));
+                return(Vector.scale(lenDenom,v));
+            }
+        } // end try
+        
+        catch(e) {
+            console.log(e);
+            return(new Vector(NaN,NaN,NaN));
+        }
+    } // end scale static method
+    
+} // end Vector class
+
+
+
+
 /* main -- here is where execution begins after window load */
 
 function main() {
@@ -465,17 +766,16 @@ function main() {
     // Get the canvas and context
     var canvas = document.getElementById("viewport"); 
     var context = canvas.getContext("2d");
- 
+    
     // Create the image
     //drawRandPixels(context);
       // shows how to draw pixels
     
-    drawRandPixelsInInputEllipsoids(context);
-      // shows how to draw pixels and read input file
-      
+    //drawRandPixelsInInputEllipsoids(context);
+    // shows how to draw pixels and read input file
+    drawRayTraceEllipsoids(context);  
     //drawInputEllipsoidsUsingArcs(context);
       // shows how to read input file, but not how to draw pixels
-    
     //drawRandPixelsInInputTriangles(context);
       // shows how to draw pixels and read input file
     
