@@ -268,7 +268,7 @@ function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
         t = t2;
     }
     if(t2 == 0 ){
-        t = 1;
+        t = t1;
     }
     
     if (discriminant < 0) {
