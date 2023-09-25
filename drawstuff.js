@@ -195,9 +195,9 @@ function blinnPhongShading(Ix, Iy, Iz, ellipsoid) {
 
     // Calculate the half-vector between the light and view directions
     var halfVec = [
-        (lightDir[0] + viewDir[0])/2,
-        (lightDir[1] + viewDir[1])/2,
-        (lightDir[2] + viewDir[2])/2
+        (lightDir[0] + viewDir[0]),
+        (lightDir[1] + viewDir[1]),
+        (lightDir[2] + viewDir[2])
     ];
 
     // Normalize the half-vector
@@ -253,12 +253,8 @@ function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
 
     // Calculate discriminant
     var discriminant = b * b - 4 * a * c;
-    if ((-b + Math.sqrt(discriminant))/(2*a) > 0) {
-    	t1 = (-b + Math.sqrt(discriminant))/(2*a); 	
-    }	    
-    if ((-b + Math.sqrt(discriminant))/(2*a) > 0) {
-    	t2 = (-b - Math.sqrt(discriminant))/(2*a); 	
-    }
+    t1 = (-b + Math.sqrt(discriminant))/(2*a);
+    t2 = (-b + Math.sqrt(discriminant))/(2*a);
     t = Math.min(t1, t2);
     
 
