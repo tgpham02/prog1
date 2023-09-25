@@ -177,7 +177,7 @@ function blinnPhongShading(Ix, Iy, Iz, ellipsoid) {
     var lightCol = [1, 1, 1]; 
     var ambCol = [1, 1, 1]; 
     var specCol = [1, 1, 1]; 
-    var shininess = 5;
+    var shininess = ellipsoid.n;
 
     // Calculate the direction vector from the intersection point to the light source
     var lightDir = [
@@ -253,11 +253,24 @@ function rayIntersectsEllipsoid(t1, t2, t, rayOrigin, rayDir, ellipsoid) {
 
     // Calculate discriminant
     var discriminant = b * b - 4 * a * c;
-    t1 = (-b + Math.sqrt(discriminant))/(2*a);
-    t2 = (-b + Math.sqrt(discriminant))/(2*a);
-    t = Math.min(t1, t2);
+    if((-b + Math.sqrt(discriminant))/(2*a) > 0){
+        t1 = (-b + Math.sqrt(discriminant))/(2*a);
+    }
     
+    if((-b + Math.sqrt(discriminant))/(2*a) > 0){
+        t2 = (-b - Math.sqrt(discriminant))/(2*a);
+    }
 
+    if(t1 > 0 && t2 > 0 ){
+        t = Math.min(t1, t2);
+    }
+    elseif(t1 == 0){
+        t = t2;
+    }
+    elseif(t2 == 0 ){
+        t = 1;
+    }
+    
     if (discriminant < 0) {
         // No intersection with the ellipsoid
         return false;
